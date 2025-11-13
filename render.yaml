@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: ai-jinro-node
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
