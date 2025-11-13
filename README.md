@@ -1,7 +1,7 @@
 # AI人狼 (Node.js サーバ)
-# サーバ: Node.js + Express
-# OpenAI: openai SDK (Chat Completions)
-# フロント: 既存の `templete/index.html` をそのまま配信
+## サーバ: Node.js + Express
+## OpenAI: openai SDK (Chat Completions)
+## フロント: 既存の `templete/index.html` をそのまま配信
 
 ## セットアップ
 1) 依存をインストール
