@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
 
@@ -25,24 +25,30 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "'message' is required" });
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "GEMINI_API_KEY is not set" });
+    }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "あなたは人狼AIです。人間に扮して自然に会話します。",
-        },
-        { role: "user", content: userMessage },
-      ],
-    });
+    const modelName = process.env.AI_MODEL || "gemini-2.5-flash"; // 必要なら他モデルへ変更
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
 
-    const aiReply = completion.choices?.[0]?.message?.content ?? "";
+    const systemPrompt = "あなたは人狼AIです。人間に扮して自然に会話します。";
+    // Geminiは1つのテキストpromptで送る（会話履歴管理は後で拡張可能）
+    const prompt = `${systemPrompt}\n\nユーザー: ${userMessage}`;
+
+    const result = await model.generateContent(prompt);
+    const aiReply = result?.response?.text() || "";
     return res.json({ reply: aiReply });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "OpenAI API error" });
+    // レートやクォータ系エラー簡易判定
+    const message = (err?.message || "Gemini API error").toLowerCase();
+    if (message.includes("quota") || message.includes("rate") || message.includes("limit")) {
+      return res.json({ reply: "ただいまAIが混み合っています。時間をおいて再試行してください。" });
+    }
+    return res.status(500).json({ error: "Gemini API error" });
   }
 });
 
