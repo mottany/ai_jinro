@@ -3,39 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <title>AI人狼チャット</title>
-  <style>
-    body { font-family: sans-serif; background: #111; color: #eee; margin: 0; padding: 0; }
-    #chat-box { height: 70vh; overflow-y: auto; padding: 10px; border-bottom: 1px solid #333; }
-    .user { color: #8ef; margin: 8px 0; }
-    .ai { color: #ff9; margin: 8px 0; }
-    #input-area { display: flex; padding: 10px; }
-    #msg { flex: 1; padding: 8px; border-radius: 6px; border: none; }
-    button { padding: 8px 16px; background: #444; color: white; border: none; border-radius: 6px; }
-  </style>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <h2 style="padding:10px;">💬 AI人狼チャットルーム</h2>
+  <h2 style="padding:10px;">💬 AI人狼チャット (複数人ルーム対応)</h2>
+  <div style="padding:10px; display:flex; gap:8px; flex-wrap:wrap; background:#181818;">
+    <input id="room" placeholder="ルーム名" style="padding:6px;" />
+    <input id="user" placeholder="ユーザー名(任意)" style="padding:6px;" />
+    <button onclick="joinRoom()">参加</button>
+    <span id="status" style="margin-left:8px; color:#ccc;"></span>
+  </div>
   <div id="chat-box"></div>
   <div id="input-area">
-    <input id="msg" placeholder="発言する..." />
-    <button onclick="sendMsg()">送信</button>
+    <input id="msg" placeholder="発言する... (/ai でAI呼び出し)" disabled />
+    <button id="sendBtn" onclick="sendMsg()" disabled>送信</button>
   </div>
 
-  <script>
-    async function sendMsg() {
-      const msg = document.getElementById("msg").value;
-      if (!msg) return;
-      document.getElementById("chat-box").innerHTML += `<div class='user'>🧑 あなた：${msg}</div>`;
-      document.getElementById("msg").value = "";
-
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg })
-      });
-      const data = await res.json();
-      document.getElementById("chat-box").innerHTML += `<div class='ai'>🐺 人狼AI：${data.reply}</div>`;
-    }
-  </script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js" defer></script>
 </body>
 </html>

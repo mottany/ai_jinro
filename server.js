@@ -1,8 +1,10 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import http from "http";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Server as SocketIOServer } from "socket.io";
 
 dotenv.config();
 
@@ -13,6 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const templateDir = path.join(__dirname, "templete");
+// 静的ファイル配信（CSS/JS）
+app.use(express.static(templateDir));
 
 app.get("/", (_req, res) => {
   res.sendFile(path.join(templateDir, "index.html"));
@@ -52,7 +56,60 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+// ---- Socket.io セットアップ ----
+const httpServer = http.createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: { origin: "*" }
+});
+
+io.on("connection", (socket) => {
+  // ルーム参加
+  socket.on("join", ({ room, user }) => {
+    if (!room) return;
+    socket.join(room);
+    socket.data.user = user || `user-${socket.id.slice(0,5)}`;
+    io.to(room).emit("system", `${socket.data.user} が参加しました`);
+  });
+
+  // 通常チャット
+  socket.on("chat", async ({ room, message }) => {
+    if (!room || !message) return;
+    const user = socket.data.user || "unknown";
+    // /ai で始まる場合はAIへ問い合わせ
+    if (message.startsWith("/ai")) {
+      const prompt = message.replace(/^\/ai\s*/, "").trim();
+      try {
+        const apiKey = process.env.GEMINI_API_KEY;
+        const modelName = process.env.AI_MODEL || "gemini-1.5-flash";
+        if (!apiKey) {
+          io.to(room).emit("chat", { user: "AI", message: "APIキー未設定です" });
+          return;
+        }
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const systemPrompt = "あなたは人狼AIです。人間に扮して自然に会話します。";
+        const fullPrompt = `${systemPrompt}\n\nユーザー(${user}): ${prompt}`;
+        const result = await model.generateContent(fullPrompt);
+        const aiReply = result?.response?.text() || "";
+        io.to(room).emit("chat", { user: "AI", message: aiReply });
+      } catch (err) {
+        console.error(err);
+        io.to(room).emit("chat", { user: "AI", message: "AI応答エラーが発生しました" });
+      }
+    } else {
+      io.to(room).emit("chat", { user, message });
+    }
+  });
+
+  socket.on("disconnect", () => {
+    // 参加していたルーム全部に通知
+    const user = socket.data.user;
+    const rooms = [...socket.rooms].filter(r => r !== socket.id);
+    rooms.forEach(r => io.to(r).emit("system", `${user || 'user'} が離脱しました`));
+  });
+});
+
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+httpServer.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
 });
